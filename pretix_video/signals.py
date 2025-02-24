@@ -1,25 +1,22 @@
+import secrets
 from base64 import b64encode
-from hashlib import sha384
 
-from django.utils.translation import gettext_lazy as _
 from django.dispatch import receiver
 from django.urls import resolve, reverse
+from django.utils.translation import gettext_lazy
 from urllib3.util import parse_url
 
 from pretix.base.middleware import _parse_csp, _merge_csp, _render_csp
 from pretix.control.signals import nav_event_settings
 from pretix.presale.signals import html_footer, process_response
 
-def _integrity(content):
-    # generate a sha256 hash of the content for the integrity attribute of the script or style tag
-    return "sha384-" + b64encode(sha384(content.encode()).digest()).decode()
 
 @receiver(nav_event_settings, dispatch_uid="video_nav_event_settings")
 def navbar_event_settings(sender, request, **kwargs):
     url = resolve(request.path_info)
     return [
         {
-            "label": _("Video Header"),
+            "label": gettext_lazy("Video Header"),
             "url": reverse(
                 "plugins:pretix_video:settings",
                 kwargs={
@@ -38,53 +35,38 @@ def global_html_page_header(sender, request, **kwargs):
     video_url = sender.settings.get("video_url")
     if not video_url:
         return
-    # Replace the <i> element with a <v> element using javascript
-    script_content = f"""
-    (function() {{
-        const i = document.querySelector('.page-header.pager-header-with-logo.logo-large img');
-        if (!i) {{ return; }}
-        i.parentElement.style.cssText = 'display: block';
-        const v = document.createElement('video');
-        v.src = '{video_url}';
-        v.setAttribute('playsinline', '');
-        v.autoplay = true;
-        v.muted = true;
-        v.loop = true;
-        v.className = 'event-logo';
-        v.style.cssText = 'width: 100%; display: block; object-fit: contain;';
-        i.replaceWith(v);
-    }})();
-    """.strip()
-    return f"<script integrity=\"{_integrity(script_content)}\">{script_content}</script>"
+
+    script_content = f"(function(){{const i=document.querySelector('.page-header.pager-header-with-logo.logo-large img.event-logo');if(!i)return;const r=i.naturalHeight/i.naturalWidth*100,p=i.parentElement;p.style.cssText='display:block;position:relative;padding-bottom:'+r+'%;width:100%';const v=document.createElement('video');v.src='{video_url}';v.setAttribute('playsinline','');v.autoplay=!0;v.muted=!0;v.loop=!0;v.className='event-logo';v.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain';i.replaceWith(v);}})();"
+    nonce = b64encode(secrets.token_bytes(16)).decode()
+    request._video_nonce = nonce
+    return f'<script nonce="{nonce}">{script_content}</script>'
+
 
 @receiver(process_response, dispatch_uid="video_process_response")
 def process_response_video_csp(sender, request, response, **kwargs):
     video_url = sender.settings.get("video_url")
-    video_url = parse_url(video_url)
     if not video_url:
         return response
-    if "Content-Security-Policy" in response:
-        headers = _parse_csp(response["Content-Security-Policy"])
-    else:
-        headers = {}
-    _merge_csp(
-        headers,
-        {
-            "script-src": [
-                "'self'",
-                "'unsafe-inline'",
-            ],
-            "style-src": [
-                "'self'",
-                "'unsafe-inline'",
-            ],
-            "media-src": [
-                "'self'",
-                "%s://%s" % (video_url.scheme, video_url.netloc),
-            ],
-        },
-    )
 
+    # Get stored hash from request
+    nonce = getattr(request, "_video_nonce", None)
+
+    # Parse existing CSP
+    headers = {}
+    if "Content-Security-Policy" in response:
+        headers = _parse_csp(response.get("Content-Security-Policy", ""))
+
+    # Update media-src with video domain
+    video_netloc = parse_url(video_url).netloc
+
+    _merge_csp(headers, {"media-src": [video_netloc]})
+
+    # Add script hash to CSP if exists
+    if nonce:
+        _merge_csp(headers, {"script-src": [f"'nonce-{nonce}'"]})
+
+    # Apply updated CSP
     if headers:
         response["Content-Security-Policy"] = _render_csp(headers)
+
     return response
