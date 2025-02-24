@@ -1,0 +1,5 @@
+[plugin]
+package = "pretix-video-header"
+modules = [ "pretix_video" ]
+marketplace_name = "video-header"
+

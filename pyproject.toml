@@ -1,0 +1,42 @@
+[project]
+name = "pretix-video-header"
+dynamic = ["version"]
+description = "Replace the image / gif with a HTML5 video element"
+readme = "README.rst"
+license = {text = "Apache"}
+keywords = ["pretix"]
+authors = [
+    {name = "Daniel Malik", email = "mail@fronbasal.de"},
+]
+maintainers = [
+    {name = "Daniel Malik", email = "mail@fronbasal.de"},
+]
+
+dependencies = [
+]
+
+[project.entry-points."pretix.plugin"]
+pretix_video = "pretix_video:PretixPluginMeta"
+
+[project.entry-points."distutils.commands"]
+build = "pretix_plugin_build.build:CustomBuild"
+
+[build-system]
+requires = [
+    "setuptools",
+    "pretix-plugin-build",
+]
+
+[project.urls]
+homepage = "https://github.com/fronbasal/pretix-video-header"
+repository = "https://github.com/fronbasal/pretix-video-header"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "pretix_video.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["pretix*"]
+namespaces = false

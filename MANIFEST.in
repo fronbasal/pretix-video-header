@@ -1,0 +1,5 @@
+recursive-include pretix_video/static *
+recursive-include pretix_video/templates *
+recursive-include pretix_video/locale *
+include LICENSE
+exclude .gitlab-ci.yml
