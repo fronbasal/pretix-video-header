@@ -11,6 +11,7 @@ from pretix.control.signals import nav_event_settings
 from pretix.presale.signals import html_footer, process_response
 
 
+
 @receiver(nav_event_settings, dispatch_uid="video_nav_event_settings")
 def navbar_event_settings(sender, request, **kwargs):
     url = resolve(request.path_info)
@@ -36,8 +37,24 @@ def global_html_page_header(sender, request, **kwargs):
     if not video_url:
         return
 
-    script_content = f"(function(){{const i=document.querySelector('.page-header.pager-header-with-logo.logo-large img.event-logo');if(!i)return;const r=i.naturalHeight/i.naturalWidth*100,p=i.parentElement;p.style.cssText='display:block;position:relative;padding-bottom:'+r+'%;width:100%';const v=document.createElement('video');v.src='{video_url}';v.setAttribute('playsinline','');v.autoplay=!0;v.muted=!0;v.loop=!0;v.className='event-logo';v.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain';i.replaceWith(v);}})();"
-    nonce = b64encode(secrets.token_bytes(16)).decode()
+    script_content = f"""(function() {{
+        const i = document.querySelector('.page-header.pager-header-with-logo.logo-large img.event-logo');
+        if (!i) return;
+        const r = i.naturalHeight / i.naturalWidth * 100,
+        p = i.parentElement;
+        p.style.cssText = 'display:block;position:relative;padding-bottom:' + r + '%;width:100%';
+        const v = document.createElement('video');
+        v.poster = i.src;
+        v.src = '{video_url}';
+        v.setAttribute('playsinline', '');
+        v.autoplay = !0;
+        v.muted = !0;
+        v.loop = !0;
+        v.className = 'event-logo';
+        v.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain';
+        i.replaceWith(v);
+    }})();"""
+    nonce = b64encode(secrets.token_bytes(16)).decode("utf-8")
     request._video_nonce = nonce
     return f'<script nonce="{nonce}">{script_content}</script>'
 
