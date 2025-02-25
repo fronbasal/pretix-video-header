@@ -54,6 +54,8 @@ def global_html_page_header(sender, request, **kwargs):
         v.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain';
         i.replaceWith(v);
     }})();"""
+    # compress script (remove newlines)
+    "".join(s.strip() for s in script_content.split('\n')).replace(" = ", "=")
     nonce = b64encode(secrets.token_bytes(16)).decode("utf-8")
     request._video_nonce = nonce
     return f'<script nonce="{nonce}">{script_content}</script>'
